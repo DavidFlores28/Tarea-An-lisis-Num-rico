@@ -1,0 +1,758 @@
+---
+title: "Tarea 5. Diferenciación e integración numérica."
+author: "Luis David Flores Muñoz"
+format: 
+  html:
+    grid: 
+      body-width: 1000px
+editor: visual
+jupyter: python3
+---
+
+Importamos packages y funciones necesarias:
+
+```{python}
+#| code-fold: true
+
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+
+import plotly.graph_objects as go
+from scipy.differentiate import derivative
+import numdifftools as nd
+from scipy import integrate
+import pandas as pd
+```
+
+# Ejercicio 1.
+
+Para cada función se realizan las siguientes gráficas: - La función original en el intervalo dado. - Comparación de derivadas (primera y segunda) exactas vs. aproximadas con `nd.Derivative` (distintos métodos y órdenes) y con `scipy.differentiate.derivative`. - Gráficas de errores absolutos.
+
+## a) $f(x)=e^{2x}-\cos 2x$, $x\in [0,2]$
+
+```{python}
+#| code-fold: true
+
+# Definición de la función y sus derivadas exactas
+fa   = lambda x: np.exp(2*x) - np.cos(2*x)
+dfa  = lambda x: 2*np.exp(2*x) + 2*np.sin(2*x)
+d2fa = lambda x: 4*np.exp(2*x) + 4*np.cos(2*x)
+
+x_a = np.linspace(0, 2, 300)
+
+# ---- Gráfica de la función ----
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(x_a, fa(x_a), color='mediumorchid', linewidth=2.5, label=r'$f(x)=e^{2x}-\cos2x$')
+ax.set_title('Función f(x) = e^(2x) - cos(2x)', fontsize=14, fontweight='bold')
+ax.set_xlabel('x')
+ax.set_ylabel('f(x)')
+ax.legend()
+ax.grid(alpha=0.4)
+plt.tight_layout()
+plt.show()
+
+# ---- Primera derivada ----
+h1, h2 = 0.1, 0.01
+methods = ['forward', 'backward', 'central']
+colores = ['tomato', 'dodgerblue', 'limegreen']
+ordenes = [2, 4]
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_a, dfa(x_a), 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    # scipy derivative
+    res_sp = derivative(fa, x_a)
+    ax.plot(x_a, res_sp.df, 'gold', linewidth=1.8, linestyle='--', label='scipy (h auto)')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fa, step=h, method=m, order=order)
+            ax.plot(x_a, df_nd(x_a), color=c, linewidth=1.4, linestyle=ls,
+                    label=f'{m}, h={h}')
+    ax.set_title(f'1a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x')
+    ax.legend(fontsize=7, ncol=2)
+    ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=e^{2x}-\cos2x$  —  Primera derivada', fontsize=13, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# ---- Segunda derivada ----
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_a, d2fa(x_a), 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            d2f_nd = nd.Derivative(fa, step=h, method=m, order=order, n=2)
+            ax.plot(x_a, d2f_nd(x_a), color=c, linewidth=1.4, linestyle=ls,
+                    label=f'{m}, h={h}')
+    ax.set_title(f'2a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x')
+    ax.legend(fontsize=7, ncol=2)
+    ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=e^{2x}-\cos2x$  —  Segunda derivada', fontsize=13, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# ---- Errores absolutos primera derivada ----
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+exacta1 = dfa(x_a)
+for ax, order in zip(axes, ordenes):
+    res_sp = derivative(fa, x_a)
+    ax.semilogy(x_a, np.abs(res_sp.df - exacta1) + 1e-16, 'gold', lw=1.8,
+                linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fa, step=h, method=m, order=order)
+            ax.semilogy(x_a, np.abs(df_nd(x_a) - exacta1) + 1e-16,
+                        color=c, linewidth=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'Error absoluto 1a deriv. — order={order}', fontsize=12)
+    ax.set_xlabel('x')
+    ax.set_ylabel('|error|')
+    ax.legend(fontsize=7, ncol=2)
+    ax.grid(alpha=0.4)
+plt.suptitle(r'Errores absolutos 1a derivada  $f(x)=e^{2x}-\cos2x$',
+             fontsize=13, fontweight='bold')
+plt.tight_layout()
+plt.show()
+```
+
+## b) $f(x)=\log(x+2)-(x+1)^2$, $x\in [0,5]$
+
+```{python}
+#| code-fold: true
+
+fb   = lambda x: np.log(x+2) - (x+1)**2
+dfb  = lambda x: 1/(x+2) - 2*(x+1)
+d2fb = lambda x: -1/(x+2)**2 - 2
+
+x_b = np.linspace(0, 5, 300)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(x_b, fb(x_b), color='darkorange', linewidth=2.5,
+        label=r'$f(x)=\log(x+2)-(x+1)^2$')
+ax.set_title('Función f(x) = log(x+2) - (x+1)²', fontsize=14, fontweight='bold')
+ax.set_xlabel('x'); ax.set_ylabel('f(x)')
+ax.legend(); ax.grid(alpha=0.4)
+plt.tight_layout(); plt.show()
+
+h1, h2 = 0.1, 0.01
+methods = ['forward', 'backward', 'central']
+colores = ['tomato', 'dodgerblue', 'limegreen']
+ordenes = [2, 4]
+
+# Primera derivada
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_b, dfb(x_b), 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    res_sp = derivative(fb, x_b)
+    ax.plot(x_b, res_sp.df, 'gold', lw=1.8, linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fb, step=h, method=m, order=order)
+            ax.plot(x_b, df_nd(x_b), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'1a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=\log(x+2)-(x+1)^2$  —  Primera derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+# Segunda derivada
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_b, d2fb(x_b), 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            d2f_nd = nd.Derivative(fb, step=h, method=m, order=order, n=2)
+            ax.plot(x_b, d2f_nd(x_b), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'2a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=\log(x+2)-(x+1)^2$  —  Segunda derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+# Errores
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+exacta1 = dfb(x_b)
+for ax, order in zip(axes, ordenes):
+    res_sp = derivative(fb, x_b)
+    ax.semilogy(x_b, np.abs(res_sp.df - exacta1) + 1e-16, 'gold', lw=1.8,
+                linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fb, step=h, method=m, order=order)
+            ax.semilogy(x_b, np.abs(df_nd(x_b) - exacta1) + 1e-16,
+                        color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'Error absoluto 1a deriv. — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.set_ylabel('|error|')
+    ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'Errores absolutos  $f(x)=\log(x+2)-(x+1)^2$',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+```
+
+## c) $f(x)=\sqrt{x}\,\text{sen}(x^2)$, $x\in [0,\pi]$
+
+```{python}
+#| code-fold: true
+
+fc   = lambda x: np.sqrt(x) * np.sin(x**2)
+dfc  = lambda x: (1/(2*np.sqrt(np.where(x == 0, 1e-12, x)))) * np.sin(x**2) + np.sqrt(x) * 2*x * np.cos(x**2)
+d2fc_nd_ref = nd.Derivative(fc, n=2, method='central', order=4)
+
+x_c = np.linspace(1e-4, np.pi, 300)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(x_c, fc(x_c), color='deepskyblue', linewidth=2.5,
+        label=r'$f(x)=\sqrt{x}\,\sin(x^2)$')
+ax.set_title(r'Función $f(x)=\sqrt{x}\,\sin(x^2)$', fontsize=14, fontweight='bold')
+ax.set_xlabel('x'); ax.set_ylabel('f(x)')
+ax.legend(); ax.grid(alpha=0.4)
+plt.tight_layout(); plt.show()
+
+# Primera derivada exacta
+exacta1c = dfc(x_c)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_c, exacta1c, 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    res_sp = derivative(fc, x_c)
+    ax.plot(x_c, res_sp.df, 'gold', lw=1.8, linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fc, step=h, method=m, order=order)
+            ax.plot(x_c, df_nd(x_c), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'1a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=\sqrt{x}\,\sin(x^2)$  —  Primera derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+# Segunda derivada (referencia numérica de alta precisión)
+exacta2c = d2fc_nd_ref(x_c)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_c, exacta2c, 'k-', linewidth=2.5, label='Ref. (central, order=4)', zorder=5)
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            d2f_nd = nd.Derivative(fc, step=h, method=m, order=order, n=2)
+            ax.plot(x_c, d2f_nd(x_c), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'2a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=\sqrt{x}\,\sin(x^2)$  —  Segunda derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+# Errores
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    res_sp = derivative(fc, x_c)
+    ax.semilogy(x_c, np.abs(res_sp.df - exacta1c) + 1e-16, 'gold', lw=1.8,
+                linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fc, step=h, method=m, order=order)
+            ax.semilogy(x_c, np.abs(df_nd(x_c) - exacta1c) + 1e-16,
+                        color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'Error absoluto 1a deriv. — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.set_ylabel('|error|')
+    ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'Errores  $f(x)=\sqrt{x}\,\sin(x^2)$', fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+```
+
+## d) $f(x)=(\cos 3x)^2-e^{2x}$, $x\in [0,\pi/2]$
+
+```{python}
+#| code-fold: true
+
+fd   = lambda x: (np.cos(3*x))**2 - np.exp(2*x)
+dfd  = lambda x: -6*np.cos(3*x)*np.sin(3*x) - 2*np.exp(2*x)
+d2fd = lambda x: -18*(np.cos(3*x)**2 - np.sin(3*x)**2) - 4*np.exp(2*x)
+
+x_d = np.linspace(0, np.pi/2, 300)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(x_d, fd(x_d), color='hotpink', linewidth=2.5,
+        label=r'$f(x)=(\cos3x)^2-e^{2x}$')
+ax.set_title(r'Función $f(x)=(\cos3x)^2-e^{2x}$', fontsize=14, fontweight='bold')
+ax.set_xlabel('x'); ax.set_ylabel('f(x)')
+ax.legend(); ax.grid(alpha=0.4)
+plt.tight_layout(); plt.show()
+
+exacta1d = dfd(x_d)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_d, exacta1d, 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    res_sp = derivative(fd, x_d)
+    ax.plot(x_d, res_sp.df, 'gold', lw=1.8, linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fd, step=h, method=m, order=order)
+            ax.plot(x_d, df_nd(x_d), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'1a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=(\cos3x)^2-e^{2x}$  —  Primera derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    ax.plot(x_d, d2fd(x_d), 'k-', linewidth=2.5, label='Exacta', zorder=5)
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            d2f_nd = nd.Derivative(fd, step=h, method=m, order=order, n=2)
+            ax.plot(x_d, d2f_nd(x_d), color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'2a Derivada — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'$f(x)=(\cos3x)^2-e^{2x}$  —  Segunda derivada',
+             fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+for ax, order in zip(axes, ordenes):
+    res_sp = derivative(fd, x_d)
+    ax.semilogy(x_d, np.abs(res_sp.df - exacta1d) + 1e-16, 'gold', lw=1.8,
+                linestyle='--', label='scipy')
+    for m, c in zip(methods, colores):
+        for h, ls in zip([h1, h2], ['-', ':']):
+            df_nd = nd.Derivative(fd, step=h, method=m, order=order)
+            ax.semilogy(x_d, np.abs(df_nd(x_d) - exacta1d) + 1e-16,
+                        color=c, lw=1.4, linestyle=ls, label=f'{m}, h={h}')
+    ax.set_title(f'Error absoluto 1a deriv. — order={order}', fontsize=12)
+    ax.set_xlabel('x'); ax.set_ylabel('|error|')
+    ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.4)
+plt.suptitle(r'Errores  $f(x)=(\cos3x)^2-e^{2x}$', fontsize=13, fontweight='bold')
+plt.tight_layout(); plt.show()
+```
+
+# Ejercicio 2
+
+Elegí 3 indicadores económicos del INEGI: **Tipo de cambio nominal**, **Tasa de desocupación urbana** y **Precio promedio del petróleo crudo**. Para cada uno se grafica la serie temporal y se aproxima su derivada numérica, lo que permite ver la velocidad de cambio del indicador.
+
+```{python}
+#| code-fold: true
+
+df_inegi = pd.read_excel('TIE_Inegi_long.xlsx', parse_dates=['Fecha'])
+df_inegi = df_inegi.dropna(subset=['Tipo_cambio_nominal',
+                                    'Tasa_desocupacion_urbana',
+                                    'Precio_promedio_petroleo_crudo'])
+
+indicadores = {
+    'Tipo de cambio nominal (MXN/USD)': 'Tipo_cambio_nominal',
+    'Tasa de desocupación urbana (%)': 'Tasa_desocupacion_urbana',
+    'Precio promedio del petróleo crudo (USD/barril)': 'Precio_promedio_petroleo_crudo'
+}
+
+colores_inegi = ['steelblue', 'darkorange', 'mediumseagreen']
+colores_der   = ['tomato',   'purple',      'goldenrod']
+
+for (titulo, col), color, color_d in zip(indicadores.items(), colores_inegi, colores_der):
+    serie = df_inegi[['Fecha', col]].dropna().reset_index(drop=True)
+    t     = np.arange(len(serie))   # índice numérico (meses)
+    vals  = serie[col].values
+
+    # Derivada numérica (diferencias centrales)
+    deriv = np.gradient(vals, t)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
+
+    ax1.plot(serie['Fecha'], vals, color=color, linewidth=2)
+    ax1.set_title(titulo, fontsize=13, fontweight='bold')
+    ax1.set_ylabel('Valor')
+    ax1.grid(alpha=0.4)
+
+    ax2.plot(serie['Fecha'], deriv, color=color_d, linewidth=1.5)
+    ax2.axhline(0, color='black', linewidth=0.8, linestyle='--')
+    ax2.set_title(f'Derivada numérica de: {titulo}', fontsize=12)
+    ax2.set_ylabel('Cambio mensual')
+    ax2.set_xlabel('Fecha')
+    ax2.grid(alpha=0.4)
+
+    plt.tight_layout()
+    plt.show()
+
+    print(f"\n{'='*60}")
+    print(f"Análisis: {titulo}")
+    print(f"  Período: {serie['Fecha'].iloc[0].date()} — {serie['Fecha'].iloc[-1].date()}")
+    print(f"  Valor mínimo : {vals.min():.2f}  (aprox. {serie['Fecha'].iloc[vals.argmin()].date()})")
+    print(f"  Valor máximo : {vals.max():.2f}  (aprox. {serie['Fecha'].iloc[vals.argmax()].date()})")
+    print(f"  Mayor cambio mensual: {deriv.max():.4f}")
+    print(f"  Menor cambio mensual: {deriv.min():.4f}")
+```
+
+**Análisis breve:**
+
+- **Tipo de cambio nominal:** se observa una tendencia general de depreciación del peso frente al dólar a lo largo del período. La derivada muestra picos pronunciados en momentos de crisis (1994-95, 2008-09, 2020), lo que indica devaluaciones abruptas.
+- **Tasa de desocupación urbana:** presenta ciclos claros. La derivada negativa sostenida en ciertos períodos indica recuperación del empleo, mientras que los picos positivos coinciden con crisis económicas.
+- **Precio del petróleo:** es el indicador más volátil. La derivada refleja las caídas bruscas de 2008, 2014-15 y 2020 (pandemia), seguidas de recuperaciones.
+
+# Ejercicio 3
+
+Calcular el valor exacto y las aproximaciones numéricas de:
+
+$$\int_0^4 x^2 e^{-x}\, dx$$
+
+```{python}
+#| code-fold: true
+
+# Valor exacto por integración por partes:
+# int_0^4 x^2 e^{-x} dx = 2 - e^{-4}(4^2 + 2*4 + 2) = 2 - 26e^{-4}
+exacto_3 = 2 - 26 * np.exp(-4)
+print(f"Valor exacto: {exacto_3:.10f}")
+
+f3 = lambda x: x**2 * np.exp(-x)
+
+# Aproximaciones con distintos métodos de integración
+# 1. Regla del trapecio
+for n in [10, 50, 100, 1000]:
+    x_trap = np.linspace(0, 4, n+1)
+    trap = np.trapezoid(f3(x_trap), x_trap)
+    print(f"Trapecio n={n:4d}: {trap:.10f}   error={abs(trap - exacto_3):.2e}")
+
+print()
+
+# 2. Regla de Simpson (scipy)
+for n in [10, 50, 100, 1000]:
+    x_simp = np.linspace(0, 4, n+1)
+    simp = integrate.simpson(f3(x_simp), x=x_simp)
+    print(f"Simpson  n={n:4d}: {simp:.10f}   error={abs(simp - exacto_3):.2e}")
+
+print()
+
+# 3. Cuadratura de Gauss (quad)
+val_quad, err_quad = integrate.quad(f3, 0, 4)
+print(f"integrate.quad      : {val_quad:.10f}   error estimado={err_quad:.2e}")
+
+print()
+
+# Comparación gráfica de errores vs. n
+ns = [4, 8, 16, 32, 64, 128, 256, 512]
+err_trap = []
+err_simp = []
+for n in ns:
+    xv = np.linspace(0, 4, n+1)
+    err_trap.append(abs(np.trapezoid(f3(xv), xv) - exacto_3))
+    err_simp.append(abs(integrate.simpson(f3(xv), x=xv) - exacto_3))
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.loglog(ns, err_trap, 'o-', color='tomato',       linewidth=2, label='Trapecio')
+ax.loglog(ns, err_simp, 's-', color='mediumorchid', linewidth=2, label='Simpson')
+ax.set_xlabel('n (subintervalos)', fontsize=12)
+ax.set_ylabel('Error absoluto', fontsize=12)
+ax.set_title(r'Convergencia numérica  $\int_0^4 x^2 e^{-x}\,dx$',
+             fontsize=13, fontweight='bold')
+ax.legend(); ax.grid(which='both', alpha=0.4)
+plt.tight_layout(); plt.show()
+```
+
+Se puede ver que Simpson converge mucho más rápido que el trapecio (pendiente ≈ −4 vs ≈ −2 en escala log-log), lo cual coincide con la teoría: Simpson tiene error $O(h^4)$ mientras que el trapecio es $O(h^2)$.
+
+# Ejercicio 4
+
+Aproximar las siguientes integrales con `integrate.quad` y con el método de Montecarlo.
+
+```{python}
+#| code-fold: true
+
+def montecarlo(f, a, b, N=500_000, rng=None):
+    """Estimación Monte Carlo de int_a^b f(x) dx"""
+    if rng is None:
+        rng = np.random.default_rng(42)
+    x_mc = rng.uniform(a, b, N)
+    return (b - a) * np.mean(f(x_mc))
+
+def grafica_area(f, a, b, color='cornflowerblue', titulo='', label_f='f(x)', n_puntos=400):
+    x_plot = np.linspace(a, b, n_puntos)
+    y_plot = f(x_plot)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(x_plot, y_plot, color=color, linewidth=2.5, label=label_f)
+    ax.fill_between(x_plot, y_plot, alpha=0.35, color=color, label='Área')
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.set_title(titulo, fontsize=13, fontweight='bold')
+    ax.set_xlabel('x'); ax.legend(); ax.grid(alpha=0.4)
+    plt.tight_layout(); plt.show()
+```
+
+## a) $\int_0^1 e^{-x^2}\,dx$
+
+```{python}
+#| code-fold: true
+
+fa4 = lambda x: np.exp(-x**2)
+grafica_area(fa4, 0, 1, color='deepskyblue', titulo=r'$\int_0^1 e^{-x^2}\,dx$',
+             label_f=r'$e^{-x^2}$')
+val_q, _  = integrate.quad(fa4, 0, 1)
+val_mc    = montecarlo(fa4, 0, 1)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## b) $\int_0^\pi \text{sen}(x^2)\,dx$
+
+```{python}
+#| code-fold: true
+
+fb4 = lambda x: np.sin(x**2)
+grafica_area(fb4, 0, np.pi, color='hotpink', titulo=r'$\int_0^\pi \sin(x^2)\,dx$',
+             label_f=r'$\sin(x^2)$')
+val_q, _  = integrate.quad(fb4, 0, np.pi)
+val_mc    = montecarlo(fb4, 0, np.pi)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## c) $\int_\pi^{3\pi} \frac{\text{sen}(x)}{x}\,dx$
+
+```{python}
+#| code-fold: true
+
+fc4 = lambda x: np.sin(x)/x
+grafica_area(fc4, np.pi, 3*np.pi, color='mediumseagreen',
+             titulo=r'$\int_\pi^{3\pi} \frac{\sin(x)}{x}\,dx$',
+             label_f=r'$\sin(x)/x$')
+val_q, _  = integrate.quad(fc4, np.pi, 3*np.pi)
+val_mc    = montecarlo(fc4, np.pi, 3*np.pi)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## d) $\int_0^\infty e^{-x^2}\cos(x)\,dx$
+
+```{python}
+#| code-fold: true
+
+# Para Montecarlo usamos truncación a 10 (la función decae muy rápido)
+fd4 = lambda x: np.exp(-x**2) * np.cos(x)
+grafica_area(fd4, 0, 5, color='darkorange',
+             titulo=r'$\int_0^\infty e^{-x^2}\cos(x)\,dx$  (graficada en [0,5])',
+             label_f=r'$e^{-x^2}\cos(x)$')
+val_q, _  = integrate.quad(fd4, 0, np.inf)
+val_mc    = montecarlo(fd4, 0, 10)
+exacto_d  = np.sqrt(np.pi)/2 * np.exp(-1/4)
+print(f"Valor exacto   : {exacto_d:.8f}  (= √π/2 · e^(-1/4))")
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## e) $\int_0^1 x^x\,dx$
+
+```{python}
+#| code-fold: true
+
+fe4 = lambda x: np.where(x > 0, x**x, 1.0)
+grafica_area(fe4, 0, 1, color='mediumorchid', titulo=r'$\int_0^1 x^x\,dx$',
+             label_f=r'$x^x$')
+val_q, _  = integrate.quad(fe4, 0, 1)
+val_mc    = montecarlo(fe4, 0, 1)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+print("(No tiene forma cerrada conocida)")
+```
+
+## f) $\int_1^5 e^{-x^2} x^3\, dx$
+
+```{python}
+#| code-fold: true
+
+ff4 = lambda x: np.exp(-x**2) * x**3
+grafica_area(ff4, 1, 5, color='steelblue', titulo=r'$\int_1^5 e^{-x^2}x^3\,dx$',
+             label_f=r'$e^{-x^2}x^3$')
+val_q, _  = integrate.quad(ff4, 1, 5)
+val_mc    = montecarlo(ff4, 1, 5)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## g) $\int_0^\infty \frac{x}{e^x-1}\, dx$
+
+```{python}
+#| code-fold: true
+
+fg4 = lambda x: np.where(x > 1e-10, x / (np.exp(np.minimum(x, 500)) - 1), 1.0)
+grafica_area(fg4, 0, 10, color='goldenrod',
+             titulo=r'$\int_0^\infty \frac{x}{e^x-1}\,dx$  (graficada en [0,10])',
+             label_f=r'$x/(e^x-1)$')
+val_q, _  = integrate.quad(fg4, 0, np.inf)
+val_mc    = montecarlo(fg4, 0, 50)
+print(f"Valor exacto   : {np.pi**2/6:.8f}  (= π²/6)")
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+## h) $\int_0^1 \frac{1}{\sqrt{x^4+1}}\, dx$
+
+```{python}
+#| code-fold: true
+
+fh4 = lambda x: 1 / np.sqrt(x**4 + 1)
+grafica_area(fh4, 0, 1, color='tomato', titulo=r'$\int_0^1 \frac{1}{\sqrt{x^4+1}}\,dx$',
+             label_f=r'$1/\sqrt{x^4+1}$')
+val_q, _  = integrate.quad(fh4, 0, 1)
+val_mc    = montecarlo(fh4, 0, 1)
+print(f"integrate.quad : {val_q:.8f}")
+print(f"Monte Carlo    : {val_mc:.8f}")
+```
+
+# Ejercicio 5
+
+## a) $\int_{-1}^{1}\int_1^2 (3y^2-x^2+5)\, dx\, dy$
+
+```{python}
+#| code-fold: true
+
+f5a = lambda x, y: 3*y**2 - x**2 + 5
+
+# Gráfica 3D
+x_g = np.linspace(1, 2, 50)
+y_g = np.linspace(-1, 1, 50)
+X5, Y5 = np.meshgrid(x_g, y_g)
+Z5 = f5a(X5, Y5)
+
+fig = plt.figure(figsize=(9, 6))
+ax  = fig.add_subplot(111, projection='3d')
+surf = ax.plot_surface(X5, Y5, Z5, cmap='plasma', alpha=0.85)
+ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_zlabel('f(x,y)')
+ax.set_title(r'$f(x,y)=3y^2-x^2+5$ en $[1,2]\times[-1,1]$',
+             fontsize=12, fontweight='bold')
+fig.colorbar(surf, ax=ax, shrink=0.5)
+plt.tight_layout(); plt.show()
+
+# Valor exacto: 22/3
+exacto_5a = 22/3
+val5a, _  = integrate.dblquad(f5a, -1, 1, 1, 2)
+print(f"Valor exacto (22/3) : {exacto_5a:.8f}")
+print(f"dblquad             : {val5a:.8f}")
+print(f"Error               : {abs(val5a - exacto_5a):.2e}")
+```
+
+## b) $\int_0^6\int_1^5 \sqrt{x+4y}\, dx\, dy$
+
+```{python}
+#| code-fold: true
+
+f5b = lambda x, y: np.sqrt(x + 4*y)
+val5b, _ = integrate.dblquad(f5b, 0, 6, 1, 5)
+print(f"dblquad: {val5b:.8f}")
+```
+
+## c) $\int_1^e\int_0^{\ln x} x^3\, dy\, dx$
+
+```{python}
+#| code-fold: true
+
+f5c = lambda y, x: x**3
+# Valor exacto: 3e^4/16 + 1/16
+exacto_5c = 3*np.e**4/16 + 1/16
+val5c, _ = integrate.dblquad(f5c, 1, np.e, 0, lambda x: np.log(x))
+print(f"Valor exacto (3e^4/16 + 1/16) : {exacto_5c:.8f}")
+print(f"dblquad                        : {val5c:.8f}")
+print(f"Error                          : {abs(val5c - exacto_5c):.2e}")
+```
+
+## d) $\iint_D 30y\,e^x\, dx\, dy$
+
+La región D está delimitada por $y = x/4$ (abajo) y $y = x$ (arriba), con $x\in[0,4]$.
+
+```{python}
+#| code-fold: true
+
+x_val = np.array([0, 4])
+y_val1 = np.array([0, 1])
+y_val2 = np.array([0, 4])
+
+plt.figure(figsize=(8, 6))
+plt.plot(x_val, y_val1, 'steelblue', linewidth=2.5, label=r'$y=x/4$')
+plt.plot(x_val, y_val2, 'tomato', linewidth=2.5, label=r'$y=x$')
+plt.fill_between(x_val, y1=y_val1, y2=y_val2, color='firebrick', alpha=0.5, label='Región D')
+plt.xlabel('x'); plt.ylabel('y')
+plt.title('Región D de integración', fontsize=13, fontweight='bold')
+plt.legend(); plt.grid(alpha=0.4)
+plt.tight_layout(); plt.show()
+
+f5d = lambda y, x: 30 * y * np.exp(x)
+val5d, _ = integrate.dblquad(f5d, 0, 4, lambda x: x/4, lambda x: x)
+print(f"dblquad: {val5d:.6f}")
+```
+
+## e) $\iiint_B z\,e^{x+y}\, dx\, dy\, dz$, $B=[0,1]^3$
+
+```{python}
+#| code-fold: true
+
+f5e = lambda z, y, x: z * np.exp(x + y)
+# Exacto: int_0^1 z dz * (int_0^1 e^x dx)^2 = (1/2) * (e-1)^2
+exacto_5e = 0.5 * (np.e - 1)**2
+val5e, _ = integrate.tplquad(f5e, 0, 1, 0, 1, 0, 1)
+print(f"Valor exacto (1/2 · (e-1)²) : {exacto_5e:.8f}")
+print(f"tplquad                      : {val5e:.8f}")
+print(f"Error                        : {abs(val5e - exacto_5e):.2e}")
+```
+
+## f) $\int_0^1\int_0^x\int_0^y (y+xz)\, dz\, dy\, dx$
+
+```{python}
+#| code-fold: true
+
+f5f = lambda z, y, x: y + x*z
+val5f, _ = integrate.tplquad(f5f, 0, 1,
+                               lambda x: 0, lambda x: x,
+                               lambda x, y: 0, lambda x, y: y)
+# Valor exacto calculando manualmente: 11/120
+exacto_5f = 11/120
+print(f"Valor exacto (11/120) : {exacto_5f:.8f}")
+print(f"tplquad               : {val5f:.8f}")
+print(f"Error                 : {abs(val5f - exacto_5f):.2e}")
+```
+
+# Ejercicio 6
+
+Elegí 5 distribuciones continuas de `scipy.stats`, grafiqué su función de densidad y calculé $P(a \le X \le b)$ tanto por integración con `quad` como con `cdf`.
+
+```{python}
+#| code-fold: true
+
+from scipy import stats
+
+distribuciones = [
+    ("Normal(μ=0, σ=1)",    stats.norm(loc=0, scale=1),      -1.96, 1.96,
+     np.linspace(-4, 4, 400),   'dodgerblue'),
+    ("Exponencial(λ=1)",     stats.expon(scale=1),             0,    2,
+     np.linspace(0, 6, 400),    'tomato'),
+    ("Gamma(α=2, β=1)",      stats.gamma(a=2, scale=1),        1,    4,
+     np.linspace(0, 10, 400),   'mediumseagreen'),
+    ("Beta(α=2, β=5)",       stats.beta(a=2, b=5),             0.1,  0.5,
+     np.linspace(0, 1, 400),    'darkorange'),
+    ("t-Student(ν=5)",       stats.t(df=5),                   -2,    2,
+     np.linspace(-5, 5, 400),   'mediumorchid'),
+]
+
+for nombre, dist, a, b, x_plot, color in distribuciones:
+    pdf_vals = dist.pdf(x_plot)
+
+    # Área bajo la curva en [a, b]
+    x_fill = x_plot[(x_plot >= a) & (x_plot <= b)]
+    y_fill = dist.pdf(x_fill)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(x_plot, pdf_vals, color=color, linewidth=2.5, label=f'PDF — {nombre}')
+    ax.fill_between(x_fill, y_fill, alpha=0.45, color=color,
+                    label=f'P({a} ≤ X ≤ {b})')
+    ax.set_title(f'Distribución {nombre}', fontsize=13, fontweight='bold')
+    ax.set_xlabel('x'); ax.set_ylabel('f(x)')
+    ax.legend(); ax.grid(alpha=0.4)
+    plt.tight_layout(); plt.show()
+
+    # Cálculo de probabilidad
+    p_quad, _ = integrate.quad(dist.pdf, a, b)
+    p_cdf     = dist.cdf(b) - dist.cdf(a)
+
+    print(f"\n{nombre}")
+    print(f"  P({a} ≤ X ≤ {b}) con quad : {p_quad:.6f}")
+    print(f"  P({a} ≤ X ≤ {b}) con cdf  : {p_cdf:.6f}")
+    print(f"  Diferencia                 : {abs(p_quad - p_cdf):.2e}")
+```
+
+Ambos métodos coinciden prácticamente en todos los casos, lo que confirma que la integración numérica con `quad` aproxima muy bien las probabilidades que ya están calculadas internamente en `cdf`.
